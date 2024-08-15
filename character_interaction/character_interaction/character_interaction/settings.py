@@ -32,13 +32,14 @@ SECRET_KEY = 'django-insecure-j3$*&mk*s@-jbpk24$pvsj+w8w_^h0=ujbrisx*e6jubxlzv4p
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*","0.0.0.0"]
 
 
 # Application definition
 
 INSTALLED_APPS = [
     'channels',
+    'whitenoise.runserver_nostatic',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
