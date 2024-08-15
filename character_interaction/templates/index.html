@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+{% load static %}
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GLB Model Viewer with Speech Recognition and Chat</title>
+    <style>
+        body {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    background-color: #f0f0f0;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -1; /* Ensure it's behind other elements if needed */
+}
+
+#controls {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    background: transparent;/* Adjust alpha value for transparency */
+    padding: 10px;
+    border-radius: 5px;
+}
+
+#chat-container {
+    flex-grow: 1;
+    padding: 10px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    background-color:  transparent; /* Adjust alpha value for transparency */
+    position: fixed;
+    bottom: 50px;
+    right: 10px;
+    width: 300px;
+    max-height: 50%;
+}
+
+.message-bubble {
+    max-width: 70%;
+    margin: 5px 0;
+    padding: 10px;
+    border-radius: 20px;
+    background-color: rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    color: #333;
+}
+
+.user-message {
+    align-self: flex-start;
+    background-color: rgba(173, 216, 230, 0.8);
+}
+
+.ai-response {
+    align-self: flex-end;
+    background-color: rgba(144, 238, 144, 0.8);
+}
+
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <button onclick="startListening()">Start Listening</button>
+        <div id="status" style="color: white;"></div>
+    </div>
+    <div id="chat-container"></div>
+
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.143.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.143.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://unpkg.com/fflate"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.143.0/examples/js/loaders/FBXLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.143.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <script>
+        // Chat Message Systeem
+        function displayMessage(message, className) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message-bubble', className);
+            messageElement.textContent = message;
+            document.getElementById('chat-container').appendChild(messageElement);
+            document.getElementById('chat-container').scrollTop = document.getElementById('chat-container').scrollHeight;
+        }
+
+        // Scene, camera, and renderer setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        document.body.appendChild(renderer.domElement);
+
+        // Mouse controls for rotating the model
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.25;
+        controls.screenSpacePanning = false;
+        controls.minDistance = 1;
+        controls.maxDistance = 1000;
+        controls.maxPolarAngle = Math.PI / 2;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+        const pointLight = new THREE.PointLight(0xffffff, 1, 100);
+        pointLight.position.set(5, 5, 5);
+        scene.add(pointLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(-5, 5, 5).normalize();
+        scene.add(directionalLight);
+
+        // Load the GLTF model
+        const gltfLoader = new THREE.GLTFLoader();
+        const fbxLoader = new THREE.FBXLoader();
+        let mixer, model;
+        const clock = new THREE.Clock();
+
+        gltfLoader.load("{% static 'avatharf.glb' %}", function (gltf) {
+            model = gltf.scene;
+            scene.add(model);
+            model.scale.set(1, 1, 1);
+            model.position.set(0, 0, 2);
+            console.log('Model loaded successfully:', model);
+
+            // Load the FBX animation
+            fbxLoader.load("{% static 'idle.fbx' %}", function (fbx) {
+                console.log("FBX animation loaded successfully");
+                mixer = new THREE.AnimationMixer(model);
+
+                fbx.animations.forEach((clip) => {
+                    const action = mixer.clipAction(clip);
+                    action.play();
+                });
+
+                // Start the animation loop
+                animate();
+            }, undefined, function (error) {
+                console.error('Error loading FBX animation:', error);
+            });
+        }, undefined, function (error) {
+            console.error('Error loading GLB model:', error);
+        });
+
+        // Adjust camera position and view
+        camera.position.set(0, 2, 4);
+        camera.lookAt(0, 0, 0);
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            if (mixer) {
+                const delta = clock.getDelta();
+                mixer.update(delta); // Update the animation mixer
+            }
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', function () {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+        });
+
+        // Speech Recognition and AI response handling will go here...
+        // Debugging outputs
+        console.log('THREE:', THREE);  // Check if THREE is loaded correctly
+        console.log('fflate:', fflate); // Check if fflate is loaded correctly
+
+        // Shape key mapping
+        const shapeKeyMapping = {
+            'A': 'viseme_PP',
+            'B': 'viseme_kk',
+            'C': 'viseme_I',
+            'D': 'viseme_AA',
+            'E': 'viseme_O',
+            'F': 'viseme_U',
+            'G': 'viseme_FF',
+            'H': 'viseme_TH',
+            'X': 'viseme_PP'
+        };
+
+        // Emotion shape key mapping
+        const emotionShapeKeys = {
+            "neutral": {
+                "mouthClose": 50,
+                "eyeBlinkLeft": 65,
+                "eyeBlinkRight": 66,
+                "browDownLeft": 15,
+                "browDownRight": 16
+            },
+            "happy": {
+                "mouthSmileLeft": 62,
+                "mouthSmileRight": 63,
+                "eyeBlinkLeft": 65,
+                "eyeBlinkRight": 66,
+                "cheekPuff": 46,
+                "eyeWideLeft": 22,
+                "eyeWideRight": 23
+            },
+            "joy": {
+                "mouthSmileLeft": 62,
+                "mouthSmileRight": 63,
+                "eyeBlinkLeft": 65,
+                "eyeBlinkRight": 66,
+                "cheekPuff": 46,
+                "eyeWideLeft": 22,
+                "eyeWideRight": 23
+            },
+            "sad": {
+                "mouthFrownLeft": 27,
+                "mouthFrownRight": 28,
+                "browDownLeft": 15,
+                "browDownRight": 16,
+                "eyeLookDownLeft": 38,
+                "eyeLookDownRight": 39
+            },
+            "sadness": {
+                "mouthFrownLeft": 27,
+                "mouthFrownRight": 28,
+                "browDownLeft": 15,
+                "browDownRight": 16,
+                "eyeLookDownLeft": 38,
+                "eyeLookDownRight": 39
+            },
+            "angry": {
+                "browInnerUp": 17,
+                "browOuterUpLeft": 18,
+                "browOuterUpRight": 19,
+                "eyeSquintLeft": 20,
+                "eyeSquintRight": 21,
+                "mouthFrownLeft": 27,
+                "mouthFrownRight": 28
+            },
+            "surprised": {
+                "jawOpen": 49,
+                "eyeWideLeft": 22,
+                "eyeWideRight": 23,
+                "browInnerUp": 17
+            },
+            "fear": {
+                "browOuterUpLeft": 18,
+                "browOuterUpRight": 19,
+                "eyeLookOutLeft": 44,
+                "eyeLookOutRight": 45,
+                "mouthPucker": 29,
+                "jawOpen": 49   
+            }
+        };
+
+        // Initial setup
+        let audioContext, audioBuffer, audioStartTime;
+        let mouthCues = [];
+        let syncInterval;
+        const audio = new Audio();
+
+        // Function to update shape keys based on the audio playback time
+        function updateShapeKeys() {
+            if (!model) return;
+            const currentTime = audio.currentTime;
+
+            model.traverse(function (object) {
+                if (object.isMesh && object.morphTargetDictionary && object.morphTargetInfluences) {
+                    object.morphTargetInfluences.fill(0);
+                    mouthCues.forEach(cue => {
+                        if (currentTime >= cue.start && currentTime <= cue.end) {
+                            const shapeKeyName = shapeKeyMapping[cue.value];
+                            if (shapeKeyName) {
+                                const morphTargetIndex = object.morphTargetDictionary[shapeKeyName];
+                                if (morphTargetIndex !== undefined) {
+                                    object.morphTargetInfluences[morphTargetIndex] = 1;
+                                } else {
+                                    console.warn(`Morph target ${shapeKeyName} not found`);
+                                }
+                            } else {
+                                console.warn(`Shape key mapping not found for value ${cue.value}`);
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        // Function to apply emotion-based shape keys
+       // Function to apply emotion-based shape keys
+        function applyEmotion(emotion) {
+            if (!model) return;
+            const shapeKeys = emotionShapeKeys[emotion];
+            if (shapeKeys) {
+                model.traverse(function (child) {
+                                if (child.isMesh) {
+                                    const morphTargetNames = child.morphTargetDictionary;
+                                    if (morphTargetNames) {
+                                        // Reset all shape keys to 0
+                                        child.morphTargetInfluences.fill(0);
+                                        // Apply the selected emotion shape keys
+                                        for (const [key, index] of Object.entries(shapeKeys)) {
+                                            if (morphTargetNames[key] !== undefined && index < child.morphTargetInfluences.length) {
+                                                child.morphTargetInfluences[morphTargetNames[key]] = 1;
+                                            } else {
+                                                console.error('Shape key not found:', key);
+                                            }
+                                        }
+                                        console.log('Applied emotion:', emotion);
+                                    }
+                                }
+                            });
+            } else {
+                console.warn(`Emotion ${emotion} not found`);
+            }
+        }
+        function clearEmotion() {
+            if (!model) return;
+            model.traverse(function (object) {
+                if (object.isMesh && object.morphTargetInfluences) {
+                    object.morphTargetInfluences.fill(0); // Reset all influences
+                }
+            });
+        }
+
+
+            // Function to blink both eyes
+            function blinkEyes() {
+            if (!model) return;
+
+            model.traverse(function (object) {
+                if (object.isMesh && object.morphTargetDictionary) {
+                    const morphDict = object.morphTargetDictionary;
+                    const morphTargets = object.morphTargetInfluences;
+
+                    // Blink the eyes (set to 1)
+                    if (morphDict.hasOwnProperty('eyeBlinkLeft') && morphDict.hasOwnProperty('eyeBlinkRight')) {
+                        morphTargets[morphDict['eyeBlinkLeft']] = 1.0;
+                        morphTargets[morphDict['eyeBlinkRight']] = 1.0;
+
+                        // Reset the blink after 100ms (duration of the blink)
+                        setTimeout(() => {
+                            morphTargets[morphDict['eyeBlinkLeft']] = 0;
+                            morphTargets[morphDict['eyeBlinkRight']] = 0;
+                        }, 100);
+                    }
+                }
+            });
+        }
+
+        // Call the blinkEyes function every 5 seconds
+        setInterval(blinkEyes, 5000);
+
+
+
+
+        // Function to start listening
+        function startListening() {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = 'Listening';
+
+            if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+                alert('Speech recognition not supported in this browser.');
+                statusElement.textContent = 'Stop';
+                return;
+            }
+
+            const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+            recognition.lang = 'en-US';
+
+            recognition.start();
+
+            recognition.onresult = function (event) {
+                const transcript = event.results[0][0].transcript;
+                console.log('Transcript:', transcript);
+                displayMessage(transcript,'ai-response');
+
+                sendMessage(transcript);
+                statusElement.textContent = `Status: Transcription: ${transcript}`;
+            };
+
+            recognition.onerror = function (event) {
+                console.error('Speech recognition error:', event.error);
+                alert('Error: ' + event.error);
+                statusElement.textContent = 'Status: Idle';
+            };
+
+            recognition.onend = function () {
+                console.log('Speech recognition ended.');
+                statusElement.textContent = 'Status: Idle';
+            };
+        }
+
+      
+
+        // Function to send a message via WebSocket
+        function sendMessage(message) {
+    const socket = new WebSocket('ws://' + window.location.host + '/ws/chat/');
+
+    socket.onopen = function () {
+        socket.send(JSON.stringify({ message: message }));
+    };
+
+    socket.onmessage = function (event) {
+        const data = JSON.parse(event.data);
+        const lipSyncDataUrl = data.lipSyncDataUrl;
+        const text = data.text;
+        audio.src = data.audio;
+        const emotion = data.emotion;
+        console.log('Emotion detected:', emotion);
+
+        // Fetch lip sync data from the server
+        fetch(lipSyncDataUrl)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch lip sync data: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(jsonData => {
+                console.log(jsonData);
+                mouthCues = jsonData.mouthCues;
+
+                // Apply emotion to the model
+                applyEmotion(emotion);
+
+                
+                // Simulate AI response
+              
+                displayMessage(text, 'user-message');
+            
+
+                // Start playing the audio and handle lip sync cues
+                audio.play();
+                clearInterval(syncInterval); // Clear any existing intervals
+                syncInterval = setInterval(updateShapeKeys, 100); // Update every 100ms
+
+                // Clear emotion after the audio ends
+                audio.onended = function () {
+                    clearEmotion();
+                };
+            })
+            .catch(error => {
+                console.error('Error fetching lip sync data:', error);
+            });
+    };
+}
+
+    </script>
+</body>
+</html>
